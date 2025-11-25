@@ -1,0 +1,8 @@
+include:
+  - project: 'anetat/anetat-devsecops/anetat-devsecops-pipeline'
+    ref: "main"
+    file: '/anetat-devsecops-gitlab-ci.yml'
+variables:
+  APP_NAME: "som-anesp"
+  APP_TYPE: "expressjs"
+  TEMPLATE_REPO_REF: "main"
