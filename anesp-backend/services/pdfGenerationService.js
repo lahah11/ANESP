@@ -38,6 +38,32 @@ function toB64(filePath) {
   return `data:${mime};base64,${buf.toString('base64')}`;
 }
 
+function getFontFaceCSS() {
+  try {
+    const fonts = [
+      { name: 'ArabicFont', file: 'NotoNaskhArabic-Regular.ttf', weight: 400 },
+      { name: 'ArabicFont', file: 'NotoNaskhArabic-Bold.ttf', weight: 700 },
+      { name: 'Louguiya', file: 'Louguiya.ttf', weight: 400 },
+      { name: 'Louguiya', file: 'LouguiyaBold.ttf', weight: 700 }
+    ];
+
+    return fonts.map((font) => {
+      const fontPath = path.join(__dirname, `../fonts/${font.file}`);
+      const fontData = fs.readFileSync(fontPath).toString('base64');
+      return `@font-face {\n` +
+             `  font-family: '${font.name}';\n` +
+             `  src: url('data:font/ttf;base64,${fontData}') format('truetype');\n` +
+             `  font-weight: ${font.weight};\n` +
+             `  font-style: normal;\n` +
+             `  font-display: swap;\n` +
+             `}`;
+    }).join('\n');
+  } catch (error) {
+    console.warn('⚠️ Impossible de charger les polices arabes:', error.message);
+    return '';
+  }
+}
+
 /* ---------- Contexte unifié (toutes les données dans la table missions) ---------- */
 
 async function loadContext(mission, participants) {
@@ -164,6 +190,11 @@ const PDFGenerationService = {
       const templatePath = path.join(__dirname, '../templates/mission-order.html');
       let html = fs.readFileSync(templatePath, 'utf8');
 
+      const fontFaceCSS = getFontFaceCSS();
+      if (fontFaceCSS) {
+        html = html.replace('<style>', `<style>\n${fontFaceCSS}\n`);
+      }
+
        // Récupérer les informations complètes du créateur
        let creatorInfo = null;
        if (unifiedMission.created_by) {
@@ -286,6 +317,14 @@ const PDFGenerationService = {
       await page.setDefaultNavigationTimeout(60000);
       await page.emulateMediaType('screen');
       await page.setContent(html, { waitUntil: 'networkidle0' });
+
+      // S'assurer que les polices intégrées sont bien chargées avant de générer le PDF
+      try {
+        await page.evaluateHandle('document.fonts.ready');
+        await page.waitForFunction(() => document.fonts.status === 'loaded');
+      } catch (fontError) {
+        console.warn('⚠️ Impossible de confirmer le chargement des polices:', fontError.message);
+      }
 
       const pdfBuffer = await page.pdf({
         format: 'A4',
